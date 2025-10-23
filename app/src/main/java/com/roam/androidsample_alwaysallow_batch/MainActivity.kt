@@ -73,8 +73,11 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
         statusMessage = if (isTracking) "Tracking is started" else "Tracking is stopped"
     }
 
-    // Helper function to start tracking after all permissions are granted
-    val startTrackingWithPermissions = {
+    // Helper function to actually start tracking (called when all permissions are granted)
+    val startTrackingInternal = {
+        // Start foreground service first
+        ForegroundLocationService.startService(context)
+
         startTracking(
             onSuccess = { message ->
                 isTracking = true
@@ -84,6 +87,8 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
                     .show()
             },
             onError = { error ->
+                // Stop foreground service if tracking failed
+                ForegroundLocationService.stopService(context)
                 isLoading = false
                 Toast.makeText(
                     context,
@@ -92,6 +97,43 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
                 ).show()
             }
         )
+    }
+
+    // Notification permission launcher (Android 13+)
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            // Notification permission granted, proceed with starting tracking
+            startTrackingInternal()
+        } else {
+            isLoading = false
+            Toast.makeText(
+                context,
+                "Notification permission is required to show tracking status",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    // Helper function to start tracking after checking all permissions
+    fun startTrackingWithPermissions() {
+        // Check notification permission for Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val notificationPermissionGranted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (!notificationPermissionGranted) {
+                // Request notification permission first
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                return
+            }
+        }
+
+        // All permissions granted, start tracking
+        startTrackingInternal()
     }
 
     // Background location permission launcher
@@ -180,10 +222,12 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
         Button(
             onClick = {
                 if (isTracking) {
-                    // Stop tracking
+                    // Stop tracking and foreground service
                     isLoading = true
                     stopTracking(
                         onSuccess = {
+                            // Stop foreground service after stopping tracking
+                            ForegroundLocationService.stopService(context)
                             isTracking = false
                             statusMessage = "Tracking is stopped"
                             isLoading = false
@@ -191,6 +235,8 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
                                 .show()
                         },
                         onError = {
+                            // Stop foreground service even if tracking failed
+                            ForegroundLocationService.stopService(context)
                             isLoading = false
                             Toast.makeText(
                                 context,
@@ -221,7 +267,17 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
                             true // Background permission not needed for Android 9 and below
                         }
 
-                    if (fineLocationGranted && phoneStateGranted && backgroundLocationGranted) {
+                    val notificationPermissionGranted =
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) == PackageManager.PERMISSION_GRANTED
+                        } else {
+                            true // Notification permission not needed for Android 12 and below
+                        }
+
+                    if (fineLocationGranted && phoneStateGranted && backgroundLocationGranted && notificationPermissionGranted) {
                         // All permissions granted, start tracking directly
                         isLoading = true
                         startTrackingWithPermissions()
@@ -239,6 +295,9 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
                         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !backgroundLocationGranted) {
                             // Request background location permission
                             backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationPermissionGranted) {
+                            // Request notification permission
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
                     }
                 }
@@ -263,7 +322,7 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = "Permissions required:\n• Location (Always Allow)\n• Read Phone State",
+            text = "Permissions required:\n• Location (Always Allow)\n• Read Phone State\n• Notifications (Android 13+)\n\nTracking automatically includes foreground service with notification for persistent background operation.",
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 16.dp),
