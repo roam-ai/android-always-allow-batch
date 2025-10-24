@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.roam.androidsample_alwaysallow_batch.ui.theme.RoamAndroidSampleAlwaysAllowBatchTheme
 import com.roam.sdk.Roam
+import com.roam.sdk.builder.RoamTrackingMode
 import com.roam.sdk.callback.TrackingCallback
 import com.roam.sdk.models.RoamError
 
@@ -335,7 +336,21 @@ private fun startTracking(
     onSuccess: (String?) -> Unit,
     onError: (RoamError?) -> Unit
 ) {
-    Roam.startTracking(object : TrackingCallback {
+//    Roam.startTracking(object : TrackingCallback {
+//        override fun onSuccess(message: String?) {
+//            onSuccess(message)
+//        }
+//
+//        override fun onError(error: RoamError?) {
+//            onError(error)
+//        }
+//    })
+
+    val mode =  RoamTrackingMode.Builder(5)
+        .setDesiredAccuracy(RoamTrackingMode.DesiredAccuracy.HIGH)
+        .build();
+
+    Roam.startTracking(mode,object : TrackingCallback {
         override fun onSuccess(message: String?) {
             onSuccess(message)
         }
