@@ -58,5 +58,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    implementation(libs.roam.android)
+    //implementation(libs.roam.android)
+
+    implementation("io.github.roam-sdk:roam-android:0.2.0")
 }

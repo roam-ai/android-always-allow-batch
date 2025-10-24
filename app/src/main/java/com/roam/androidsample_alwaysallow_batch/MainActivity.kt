@@ -65,13 +65,13 @@ class MainActivity : ComponentActivity() {
 fun TrackingScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var isTracking by remember { mutableStateOf(false) }
-    var statusMessage by remember { mutableStateOf("Tracking is stopped") }
+    var statusMessage by remember { mutableStateOf("Ready to start tracking") }
     var isLoading by remember { mutableStateOf(false) }
 
     // Check tracking status on composition
     LaunchedEffect(Unit) {
         isTracking = Roam.isLocationTracking()
-        statusMessage = if (isTracking) "Tracking is started" else "Tracking is stopped"
+        statusMessage = if (isTracking) "Tracking is active" else "Ready to start tracking"
     }
 
     // Helper function to actually start tracking (called when all permissions are granted)
@@ -82,14 +82,12 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
         startTracking(
             onSuccess = { message ->
                 isTracking = true
-                statusMessage = "Tracking is started"
+                statusMessage = "Tracking is active"
                 isLoading = false
-                Toast.makeText(context, "Tracking started successfully", Toast.LENGTH_SHORT)
+                Toast.makeText(context, "tracking started successfully", Toast.LENGTH_SHORT)
                     .show()
             },
             onError = { error ->
-                // Stop foreground service if tracking failed
-                ForegroundLocationService.stopService(context)
                 isLoading = false
                 Toast.makeText(
                     context,
@@ -222,31 +220,8 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
 
         Button(
             onClick = {
-                if (isTracking) {
-                    // Stop tracking and foreground service
-                    isLoading = true
-                    stopTracking(
-                        onSuccess = {
-                            // Stop foreground service after stopping tracking
-                            ForegroundLocationService.stopService(context)
-                            isTracking = false
-                            statusMessage = "Tracking is stopped"
-                            isLoading = false
-                            Toast.makeText(context, "Tracking stopped", Toast.LENGTH_SHORT)
-                                .show()
-                        },
-                        onError = {
-                            // Stop foreground service even if tracking failed
-                            ForegroundLocationService.stopService(context)
-                            isLoading = false
-                            Toast.makeText(
-                                context,
-                                "Failed to stop tracking",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    )
-                } else {
+                // Only allow starting tracking if not already tracking
+                if (!isTracking) {
                     // Check permissions before starting tracking
                     val fineLocationGranted = ContextCompat.checkSelfPermission(
                         context,
@@ -303,7 +278,7 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
                     }
                 }
             },
-            enabled = !isLoading,
+            enabled = !isLoading && !isTracking,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
@@ -315,7 +290,7 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
                 )
             } else {
                 Text(
-                    text = if (isTracking) "Stop Tracking" else "Start Tracking",
+                    text = if (isTracking) "Tracking Active" else "Start Tracking",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -323,7 +298,7 @@ fun TrackingScreen(modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = "Permissions required:\n• Location (Always Allow)\n• Read Phone State\n• Notifications (Android 13+)\n\nTracking automatically includes foreground service with notification for persistent background operation.",
+            text = "Permissions required:\n• Location (Always Allow)\n• Read Phone State\n• Notifications (Android 13+)\n\n tracking includes foreground service with notification for persistent background operation.",
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 16.dp),
@@ -336,21 +311,7 @@ private fun startTracking(
     onSuccess: (String?) -> Unit,
     onError: (RoamError?) -> Unit
 ) {
-//    Roam.startTracking(object : TrackingCallback {
-//        override fun onSuccess(message: String?) {
-//            onSuccess(message)
-//        }
-//
-//        override fun onError(error: RoamError?) {
-//            onError(error)
-//        }
-//    })
-
-    val mode =  RoamTrackingMode.Builder(5)
-        .setDesiredAccuracy(RoamTrackingMode.DesiredAccuracy.HIGH)
-        .build();
-
-    Roam.startTracking(mode,object : TrackingCallback {
+    Roam.startTracking(object : TrackingCallback {
         override fun onSuccess(message: String?) {
             onSuccess(message)
         }
@@ -359,26 +320,9 @@ private fun startTracking(
             onError(error)
         }
     })
+
 }
 
-private fun stopTracking(
-    onSuccess: () -> Unit,
-    onError: () -> Unit
-) {
-    try {
-        Roam.stopTracking(object : TrackingCallback {
-            override fun onSuccess(message: String?) {
-                onSuccess()
-            }
-
-            override fun onError(error: RoamError?) {
-                onError()
-            }
-        })
-    } catch (e: Exception) {
-        onError()
-    }
-}
 
 
 @Preview(showBackground = true)

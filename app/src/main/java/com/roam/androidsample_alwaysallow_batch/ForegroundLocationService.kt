@@ -24,7 +24,6 @@ class ForegroundLocationService : Service() {
         private const val CHANNEL_DESCRIPTION = "Shows when the app is tracking your location"
 
         const val ACTION_START_TRACKING = "start_tracking"
-        const val ACTION_STOP_TRACKING = "stop_tracking"
 
         /**
          * Start the foreground location service
@@ -41,15 +40,6 @@ class ForegroundLocationService : Service() {
             }
         }
 
-        /**
-         * Stop the foreground location service
-         */
-        fun stopService(context: Context) {
-            val intent = Intent(context, ForegroundLocationService::class.java).apply {
-                action = ACTION_STOP_TRACKING
-            }
-            context.startService(intent)
-        }
     }
 
     private var isTracking = false
@@ -64,10 +54,6 @@ class ForegroundLocationService : Service() {
             ACTION_START_TRACKING -> {
                 startLocationTracking()
             }
-            ACTION_STOP_TRACKING -> {
-                stopLocationTracking()
-                stopSelf()
-            }
         }
 
         // Return START_STICKY to restart service if killed by system
@@ -80,7 +66,6 @@ class ForegroundLocationService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        stopLocationTracking()
     }
 
     /**
@@ -117,30 +102,14 @@ class ForegroundLocationService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // Stop tracking action
-        val stopIntent = Intent(this, ForegroundLocationService::class.java).apply {
-            action = ACTION_STOP_TRACKING
-        }
-        val stopPendingIntent = PendingIntent.getService(
-            this,
-            1,
-            stopIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Location Tracking Active")
-            .setContentText("Roam is tracking your location in the background")
+            .setContentTitle("Location Tracking Active ")
+            .setContentText("Roam is continuously tracking your location in the background")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .addAction(
-                android.R.drawable.ic_media_pause,
-                "Stop Tracking",
-                stopPendingIntent
-            )
             .build()
     }
 
@@ -155,11 +124,5 @@ class ForegroundLocationService : Service() {
         }
     }
 
-    /**
-     * Stop foreground service
-     */
-    private fun stopLocationTracking() {
-        isTracking = false
-    }
 
 }
